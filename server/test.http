@@ -1,0 +1,4 @@
+POST http://localhost:5000/api/chat
+Content-Type: application/json
+
+{ "message": "Hi, I am ready for the interview." }
