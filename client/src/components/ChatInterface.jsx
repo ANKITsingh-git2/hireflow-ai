@@ -10,6 +10,7 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [resumeId, setResumeId] = useState(null);
+  const [isListening, setIsListening] = useState(false);
   
   // Auto-scroll to bottom
   const messagesEndRef = useRef(null);
@@ -18,6 +19,7 @@ export default function ChatInterface() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
 
   useEffect(() => {
     scrollToBottom();
@@ -51,6 +53,17 @@ export default function ChatInterface() {
     }
   };
 
+  const speak = (text) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      // Select a better voice if available
+      const voices = window.speechSynthesis.getVoices();
+      // Try to find a "Google US English" voice or similar
+      utterance.voice = voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) || null;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // 2. Handle Sending Messages
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -66,13 +79,49 @@ export default function ChatInterface() {
         message: userMessage,
         candidateId: resumeId // (Optional: For future context history)
       });
-
+      
       setMessages((prev) => [...prev, { role: "ai", content: response.data.reply }]);
+      speak(response.data.reply)
     } catch (error) {
       setMessages((prev) => [...prev, { role: "system", content: "⚠️ AI is having trouble connecting." }]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+   const startListening = () => {
+    // Check browser support
+    if (!('webkitSpeechRecognition' in window)) {
+      alert("Web Speech API is not supported in this browser. Try Chrome.");
+      return;
+    }
+
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.continuous = false;       // Stop after one sentence
+    recognition.interimResults = false;   // Only show final result
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript); // Fill the input box
+      // Optional: Auto-send after speaking? 
+      // handleSend(); // Uncomment if you want instant send
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   return (
@@ -151,6 +200,20 @@ export default function ChatInterface() {
             {isUploading ? <Loader2 className="animate-spin w-5 h-5"/> : <Paperclip className="w-5 h-5" />}
           </button>
 
+        {/* 👇 Voice Input Button 👇 */}
+    <button 
+      onClick={startListening}
+      disabled={isLoading || isListening}
+      className={`p-3 rounded-lg transition-all duration-300 ${
+        isListening 
+          ? "bg-red-100 text-red-600 animate-pulse border border-red-200" 
+          : "text-muted-foreground hover:bg-muted"
+      }`}
+      title="Speak"
+    >
+      <Mic className={`w-5 h-5 ${isListening ? "fill-current" : ""}`} />
+    </button>
+
           {/* Text Input */}
           <input
             className="flex-1 bg-background border border-border rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
@@ -170,6 +233,14 @@ export default function ChatInterface() {
             <Send className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Helper text for Voice */}
+  {isListening && (
+    <p className="text-xs text-red-500 mt-2 ml-14 animate-bounce">
+      Listening... Speak clearly.
+    </p>
+  )}
+
       </div>
     </div>
   );
