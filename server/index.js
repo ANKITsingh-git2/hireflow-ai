@@ -2,45 +2,42 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import mongoose from 'mongoose';
+import { Interview } from './models/Interview.js';
 
 // Services
 import { generateResponse } from './services/ai.js';
 import { addResumeToVectorDB, queryVectorDB } from './services/rag.js';
 import { extractTextFromPDF } from './services/pdf.js';
 
-// --- Configuration ---
+// Load environment variables
 dotenv.config();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configure Multer (Keep file in memory for immediate processing)
+// Multer: Keep file in memory for immediate extraction and embedding
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- Middleware ---
-app.use(cors());              // Allow Frontend access
-app.use(express.json());      // Parse JSON bodies
+// Middleware
+app.use(cors()); // Enable frontend → backend access
+app.use(express.json()); // Parse JSON in request body
 
-// --- Routes ---
+/* ----------------------------------------
+  ROUTES
+-----------------------------------------*/
 
-/**
- * 1. Health Check
- * Used by Render to verify the server is alive.
- */
-app.get('/', (req, res) => {
-    res.send({
-        status: 'Active',
-        message: 'HireFlow AI Backend is running',
-        timestamp: new Date().toISOString()
-    });
+// 1️⃣ Health Check → used by Render to keep server alive
+app.get("/", (req, res) => {
+  res.send({
+    status: "Active",
+    message: "HireFlow AI Backend is running",
+    timestamp: new Date().toISOString(),
+  });
 });
 
-/**
- * 2. Resume Upload
- * - Accepts a PDF file
- * - Extracts text
- * - Stores embeddings in Pinecone
- */
-app.post('/api/upload', upload.single('resume'), async (req, res) => {
+// 2️⃣ Resume Upload → Extract text → Store embeddings in Vector DB
+app.post("/api/upload", upload.single("resume"), async (req, res) => {
   try {
     const { file } = req;
     const { candidateId } = req.body;
@@ -51,33 +48,28 @@ app.post('/api/upload', upload.single('resume'), async (req, res) => {
 
     console.log(`📄 Received file: ${file.originalname}`);
 
-    // Extract text from PDF
+    // Extract text from PDF buffer
     const text = await extractTextFromPDF(file.buffer);
     console.log(`📝 Extracted ${text.length} characters`);
 
-    // Save to Vector DB
-    // Use filename as ID if candidateId is not provided
-    const id = candidateId || file.originalname; 
+    // Use candidateId OR filename as unique vector ID
+    const id = candidateId || file.originalname;
     await addResumeToVectorDB(text, id);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: "Resume processed and stored in memory.",
-      id: id
+      id: id,
     });
 
   } catch (error) {
-    console.error("Upload failed:", error);
+    console.error("❌ Upload failed:", error);
     res.status(500).json({ error: "Failed to process resume" });
   }
 });
 
-/**
- * 3. AI Chat Interface (RAG Enabled)
- * - Retrives resume context based on user query
- * - Generates interview response using Groq
- */
-app.post('/api/chat', async (req, res) => {
+// 3️⃣ AI Chat → RAG powered interview question generation
+app.post("/api/chat", async (req, res) => {
   const { message } = req.body;
 
   if (!message) {
@@ -85,10 +77,10 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    // A. Retrieve Context (RAG)
+    // Get resume-based context from Vector DB
     const context = await queryVectorDB(message);
 
-    // B. Construct System Prompt
+    // Your EXACT system prompt — NOT modified
     const systemPrompt = `
       You are an AI Technical Recruiter named "HireFlow".
       
@@ -109,21 +101,93 @@ app.post('/api/chat', async (req, res) => {
       Generate the next interview question or response:
     `;
 
-    // C. Generate Response
     const aiReply = await generateResponse(systemPrompt);
 
-    res.json({ 
+    res.json({
       reply: aiReply,
-      contextUsed: context ? "Found relevant resume info" : "No context found" 
+      contextUsed: context ? "Found relevant resume info" : "No context found",
     });
 
   } catch (error) {
-    console.error("Chat Error:", error);
+    console.error("❌ Chat Error:", error);
     res.status(500).json({ error: "AI generation failed" });
   }
 });
 
-// --- Server Start ---
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+// 4️⃣ End Interview → Generate Final Score + Save to MongoDB
+app.post("/api/interview/end", async (req, res) => {
+  const { messages, candidateId } = req.body;
+
+  try {
+    // Combine chat messages into a readable transcript
+    const transcript = messages
+      .map((m) => `${m.role}: ${m.content}`)
+      .join("\n");
+
+    // Your EXACT evaluation prompt — NOT modified  
+    const analysisPrompt = `
+      Analyze this technical interview transcript.
+      TRANSCRIPT:
+      ${transcript}
+      
+      Generate a JSON summary of the candidate's performance.
+      Strictly follow this JSON format (no markdown, just raw json):
+      {
+        "technicalScore": (0-100),
+        "communicationScore": (0-100),
+        "summary": "2 sentence summary",
+        "strengths": ["point 1", "point 2"],
+        "weaknesses": ["point 1", "point 2"],
+        "verdict": "Hire" or "No Hire" or "Review"
+      }
+    `;
+
+    const rawAnalysis = await generateResponse(analysisPrompt);
+
+    // Remove accidental code fences
+    const cleanJson = rawAnalysis.replace(/```json|```/g, "").trim();
+    const feedback = JSON.parse(cleanJson);
+
+    // Save interview record
+    const interview = new Interview({ candidateId, messages, feedback });
+    await interview.save();
+
+    res.json({ success: true, interviewId: interview._id, feedback });
+
+  } catch (error) {
+    console.error("❌ End Interview Error:", error);
+    res.status(500).json({ error: "Failed to generate report" });
+  }
 });
+
+// 5️⃣ Fetch All Interviews → Dashboard display
+app.get("/api/interviews", async (req, res) => {
+  try {
+    const interviews = await Interview.find().sort({ date: -1 });
+    res.json(interviews);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Fetch failed" });
+  }
+});
+
+/* ----------------------------------------
+  SERVER + DATABASE INITIALIZATION
+-----------------------------------------*/
+
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("🟢 MongoDB Connected Successfully");
+
+    app.listen(PORT, () =>
+      console.log(`🚀 Server running on http://localhost:${PORT}`)
+    );
+  } catch (err) {
+    console.error("🔴 MongoDB Connection Failed:", err);
+    process.exit(1);
+  }
+}
+
+// Initialize Server + DB
+startServer();
