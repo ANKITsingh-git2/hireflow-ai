@@ -16,7 +16,8 @@ import { generateInterviewPDF } from './services/pdfGenerator.js';
 import { sendInterviewCompletionEmail, sendHRNotification } from './services/emailService.js';
 
 // Load environment variables
-dotenv.config();
+// On Render, env vars come from dashboard, not .env file
+dotenv.config({ path: '.env' });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -268,6 +269,14 @@ app.get("/api/interviews", requireAuth ,async (req, res) => {
 
 async function startServer() {
   try {
+    // Verify environment variables are loaded
+    if (!process.env.MONGO_URI) {
+      console.error("🔴 ERROR: MONGO_URI environment variable is not set!");
+      console.error("Available env vars:", Object.keys(process.env).filter(k => !k.includes('SECRET')).join(', '));
+      process.exit(1);
+    }
+    
+    console.log("🔵 Attempting MongoDB connection...");
     await mongoose.connect(process.env.MONGO_URI);
     console.log("🟢 MongoDB Connected Successfully");
 
