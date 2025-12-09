@@ -367,7 +367,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Google Gemini for AI capabilities
+- Google Gemini and Groq for AI capabilities
 - Pinecone for vector search
 - Clerk for authentication
 - MongoDB for database
@@ -377,7 +377,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Built with ❤️ for better hiring experiences**
+**Built by Ankit for better hiring experiences**
 
 ⭐ Star this repo if you find it helpful!
 
