@@ -76,13 +76,22 @@ function App() {
             </ul>
           </div>
 
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Reload Page
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reload Page
+            </button>
+
+            <button
+              onClick={() => setClerkLoadError(false)}
+              className="w-full px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:opacity-90 transition-all border border-border flex items-center justify-center gap-2"
+            >
+              Continue Without Login
+            </button>
+          </div>
 
           <div className="pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground mb-2">
