@@ -4,11 +4,16 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import mongoose from 'mongoose';
 import { Interview } from './models/Interview.js';
+import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+
+const requireAuth = ClerkExpressRequireAuth({})
 
 // Services
 import { generateResponse } from './services/ai.js';
 import { addResumeToVectorDB, queryVectorDB } from './services/rag.js';
 import { extractTextFromPDF } from './services/pdf.js';
+import { generateInterviewPDF } from './services/pdfGenerator.js';
+import { sendInterviewCompletionEmail, sendHRNotification } from './services/emailService.js';
 
 // Load environment variables
 dotenv.config();
@@ -20,7 +25,10 @@ const PORT = process.env.PORT || 5000;
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Middleware
-app.use(cors()); // Enable frontend → backend access
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+})); // Enable frontend → backend access
 app.use(express.json()); // Parse JSON in request body
 
 /* ----------------------------------------
@@ -36,7 +44,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// 2️⃣ Resume Upload → Extract text → Store embeddings in Vector DB
+// 2️⃣ Resume Upload → Extract text → Parse with AI → Store embeddings in Vector DB
 app.post("/api/upload", upload.single("resume"), async (req, res) => {
   try {
     const { file } = req;
@@ -52,6 +60,14 @@ app.post("/api/upload", upload.single("resume"), async (req, res) => {
     const text = await extractTextFromPDF(file.buffer);
     console.log(`📝 Extracted ${text.length} characters`);
 
+    // 🆕 Parse resume with AI to extract structured data
+    const { parseResume } = await import('./services/resumeParser.js');
+    const parseResult = await parseResume(text);
+    
+    if (!parseResult.success) {
+      console.warn('⚠️ Resume parsing failed, continuing with text only');
+    }
+
     // Use candidateId OR filename as unique vector ID
     const id = candidateId || file.originalname;
     await addResumeToVectorDB(text, id);
@@ -60,6 +76,10 @@ app.post("/api/upload", upload.single("resume"), async (req, res) => {
       success: true,
       message: "Resume processed and stored in memory.",
       id: id,
+      // 🆕 Return parsed data
+      parsedData: parseResult.success ? parseResult.data : null,
+      skills: parseResult.success ? parseResult.extractedSkills : [],
+      textLength: text.length
     });
 
   } catch (error) {
@@ -114,9 +134,9 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// 4️⃣ End Interview → Generate Final Score + Save to MongoDB
-app.post("/api/interview/end", async (req, res) => {
-  const { messages, candidateId } = req.body;
+// 4️⃣ End Interview → Generate Final Score + Save to MongoDB + Send Emails
+app.post("/api/interview/end", requireAuth, async (req, res) => {
+  const { messages, candidateId, candidateName, candidateEmail } = req.body;
 
   try {
     // Combine chat messages into a readable transcript
@@ -149,8 +169,49 @@ app.post("/api/interview/end", async (req, res) => {
     const feedback = JSON.parse(cleanJson);
 
     // Save interview record
-    const interview = new Interview({ candidateId, messages, feedback });
+    const interview = new Interview({ 
+      candidateId, 
+      candidateName: candidateName || 'Anonymous',
+      messages, 
+      feedback 
+    });
     await interview.save();
+
+    // 🆕 Generate PDF report
+    let pdfBuffer = null;
+    try {
+      pdfBuffer = await generateInterviewPDF(interview);
+      console.log('✅ PDF report generated');
+    } catch (pdfError) {
+      console.error('⚠️ PDF generation failed:', pdfError);
+    }
+
+    // 🆕 Send email to candidate (if email provided)
+    if (candidateEmail) {
+      try {
+        await sendInterviewCompletionEmail({
+          to: candidateEmail,
+          candidateName: candidateName || 'Candidate',
+          feedback,
+          pdfAttachment: pdfBuffer
+        });
+        console.log('✅ Email sent to candidate');
+      } catch (emailError) {
+        console.error('⚠️ Email sending failed:', emailError);
+      }
+    }
+
+    // 🆕 Send notification to HR
+    try {
+      await sendHRNotification({
+        candidateName: candidateName || 'Anonymous',
+        feedback,
+        interviewId: interview._id
+      });
+      console.log('✅ HR notification sent');
+    } catch (hrError) {
+      console.error('⚠️ HR notification failed:', hrError);
+    }
 
     res.json({ success: true, interviewId: interview._id, feedback });
 
@@ -160,8 +221,38 @@ app.post("/api/interview/end", async (req, res) => {
   }
 });
 
+// 6️⃣ Export Interview as PDF
+app.get("/api/interviews/:id/export", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch interview from database
+    const interview = await Interview.findById(id);
+    
+    if (!interview) {
+      return res.status(404).json({ error: "Interview not found" });
+    }
+
+    // Generate PDF
+    const pdfBuffer = await generateInterviewPDF(interview);
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Interview_Report_${interview.candidateName.replace(/\s+/g, '_')}.pdf"`
+    );
+
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error("❌ PDF Export Error:", error);
+    res.status(500).json({ error: "Failed to export PDF" });
+  }
+});
+
 // 5️⃣ Fetch All Interviews → Dashboard display
-app.get("/api/interviews", async (req, res) => {
+app.get("/api/interviews", requireAuth ,async (req, res) => {
   try {
     const interviews = await Interview.find().sort({ date: -1 });
     res.json(interviews);
