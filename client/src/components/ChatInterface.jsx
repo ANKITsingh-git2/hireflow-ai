@@ -155,11 +155,22 @@ const ChatInterface = forwardRef((props, ref) => {
               {msg.content}
             </div>
           </div>
-        ))}
+        ))};
 
+        {/* 🆕 Enhanced Typing Indicator */}
         {isLoading && (
-          <div className="flex items-center gap-2 text-muted-foreground ml-12 text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary">
+              <Bot size={16} className="text-primary-foreground" />
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-center gap-2">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              </div>
+              <span className="text-xs text-muted-foreground ml-2">AI is thinking...</span>
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />
