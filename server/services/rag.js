@@ -53,19 +53,25 @@ export async function addResumeToVectorDB(text, candidateId) {
 /**
  * Retrieve relevant context for a query
  * @param {string} query - The question (e.g., "Does he know React?")
+ * @param {string} candidateId - Optional candidate ID to filter results
  */
 
-export async function queryVectorDB(query) {
+export async function queryVectorDB(query, candidateId = null) {
     try {
         const vectorStore = await PineconeStore.fromExistingIndex(
             embeddings, { pineconeIndex: index }
         );
 
-        // search 2 most relevent results
-        const results = await vectorStore.similaritySearch(query, 2);
+        // Build filter object if candidateId is provided
+        const filter = candidateId ? { candidateId: candidateId } : undefined;
+
+        // Search 2 most relevant results, filtered by candidateId if provided
+        const results = await vectorStore.similaritySearch(query, 2, filter);
+        
         if (!results.length) {
-                return "No specific resume context found for this topic. Ask general technical questions.";
-             }
+            return "No specific resume context found for this topic. Ask general technical questions.";
+        }
+        
         // combine in single string
         return results.map(doc => doc.pageContent).join("\n\n");
     } catch (error) {

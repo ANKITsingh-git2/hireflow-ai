@@ -111,15 +111,15 @@ app.post("/api/upload", upload.single("resume"), async (req, res) => {
 
 // 3️⃣ AI Chat → RAG powered interview question generation
 app.post("/api/chat", async (req, res) => {
-  const { message } = req.body;
+  const { message, candidateId } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: "Message is required" });
   }
 
   try {
-    // Get resume-based context from Vector DB
-    const context = await queryVectorDB(message);
+    // Get resume-based context from Vector DB, filtered by candidateId
+    const context = await queryVectorDB(message, candidateId);
 
     // Your EXACT system prompt — NOT modified
     const systemPrompt = `
