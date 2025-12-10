@@ -4,9 +4,8 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import mongoose from 'mongoose';
 import { Interview } from './models/Interview.js';
-import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { requireAuth } from './middleware/auth.js';
 
-const requireAuth = ClerkExpressRequireAuth({})
 
 // Services
 import { generateResponse } from './services/ai.js';

@@ -2,18 +2,27 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Loader2, TrendingUp, AlertTriangle, CheckCircle, XCircle, UserCheck } from "lucide-react";
 import StatsChart from "./StatsChart";
-import { useAuth } from "@clerk/clerk-react";
+import { supabase } from "../lib/supabase";
 
 export default function Dashboard() {
   const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const { getToken } = useAuth();
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = await getToken();
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error("No active session");
+          setLoading(false);
+          return;
+        }
+
+        // Use Supabase JWT token for API authentication
+        const token = session.access_token;
+        
         const res = await api.get("/api/interviews", {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -27,7 +36,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [getToken]);
+  }, []);
 
   if (loading) {
     return (

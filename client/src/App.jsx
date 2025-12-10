@@ -1,36 +1,38 @@
 import { useState, useRef, useEffect } from "react";
-import { SignedIn, SignedOut, SignInButton, UserButton, useUser, RedirectToSignIn, useClerk } from "@clerk/clerk-react";
+import { supabase } from "./lib/supabase";
 import ChatInterface from "./components/ChatInterface";
 import CodeEditor from "./components/CodeEditor";
 import Dashboard from "./components/Dashboard";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { LogIn, LogOut, User, AlertTriangle } from "lucide-react";
 
 function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [view, setView] = useState("interview"); // "interview" or "dashboard"
-  const [clerkLoadError, setClerkLoadError] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const chatRef = useRef(null);
-  
-  // Get current user info (optional, for personalization)
-  const { user } = useUser();
-  const clerk = useClerk();
 
-  // Monitor Clerk loading status
+  // Check for existing session on mount
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!clerk.loaded) {
-        console.error("Clerk failed to load within 10 seconds");
-        setClerkLoadError(true);
-      }
-    }, 10000); // 10 second timeout
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-    if (clerk.loaded) {
-      clearTimeout(timeout);
-      setClerkLoadError(false);
-    }
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
-    return () => clearTimeout(timeout);
-  }, [clerk.loaded]);
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleCodeSubmit = async (code) => {
     setIsAnalyzing(true);
@@ -47,61 +49,36 @@ function App() {
     setIsAnalyzing(false);
   };
 
-  // Show error UI if Clerk fails to load
-  if (clerkLoadError) {
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setShowSignIn(false);
+      setEmail("");
+      setPassword("");
+    }
+
+    setAuthLoading(false);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setView("interview"); // Return to interview view on sign out
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-card border border-border rounded-xl shadow-lg p-8 text-center space-y-6">
-          <div className="flex justify-center">
-            <div className="p-4 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
-              <AlertTriangle className="w-12 h-12 text-yellow-600 dark:text-yellow-400" />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              Authentication Service Unavailable
-            </h1>
-            <p className="text-muted-foreground">
-              We're having trouble loading the authentication system. This might be due to:
-            </p>
-          </div>
-
-          <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm text-left">
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              <li>Network connectivity issues</li>
-              <li>Ad blocker or browser extension blocking scripts</li>
-              <li>Firewall or VPN restrictions</li>
-              <li>Browser cache issues</li>
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reload Page
-            </button>
-
-            <button
-              onClick={() => setClerkLoadError(false)}
-              className="w-full px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:opacity-90 transition-all border border-border flex items-center justify-center gap-2"
-            >
-              Continue Without Login
-            </button>
-          </div>
-
-          <div className="pt-4 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-2">
-              <strong>For HR/Recruiters:</strong> The interview platform works without login.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Only dashboard access requires authentication.
-            </p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -118,23 +95,27 @@ function App() {
 
         <div className="flex items-center gap-4">
           
-          {/* 🔒 IF LOGGED OUT: Show Login Button */}
-          <SignedOut>
-            <div className="text-sm text-muted-foreground mr-2 hidden sm:block">
-              Are you a Recruiter?
-            </div>
-            <SignInButton mode="modal">
-              <button className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-all shadow-md">
+          {/* IF LOGGED OUT: Show Login Button */}
+          {!user && (
+            <>
+              <div className="text-sm text-muted-foreground mr-2 hidden sm:block">
+                Are you a Recruiter?
+              </div>
+              <button
+                onClick={() => setShowSignIn(true)}
+                className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-all shadow-md flex items-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
                 HR Login
               </button>
-            </SignInButton>
-          </SignedOut>
+            </>
+          )}
 
-          {/* 🔓 IF LOGGED IN: Show Dashboard Toggle & Profile */}
-          <SignedIn>
+          {/* IF LOGGED IN: Show Dashboard Toggle & Profile */}
+          {user && (
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground hidden sm:block">
-                Welcome, {user?.firstName}
+                Welcome, {user.email?.split('@')[0]}
               </span>
               
               <button
@@ -148,14 +129,98 @@ function App() {
                 {view === "interview" ? "View Dashboard" : "Back to Interview"}
               </button>
               
-              {/* Clerk User Profile Menu */}
-              <UserButton afterSignOutUrl="/" />
+              {/* User Profile Menu */}
+              <div className="relative group">
+                <button className="p-2 rounded-full bg-primary/10 hover:bg-primary/20 transition-all">
+                  <User className="w-5 h-5 text-primary" />
+                </button>
+                
+                {/* Dropdown */}
+                <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                  <div className="p-3 border-b border-border">
+                    <p className="text-sm font-medium truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 text-red-600"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
             </div>
-          </SignedIn>
+          )}
 
         </div>
       </header>
 
+      {/* Sign In Modal */}
+      {showSignIn && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">HR Login</h2>
+              <button
+                onClick={() => {
+                  setShowSignIn(false);
+                  setAuthError("");
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+
+            {authError && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="hr@company.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all shadow-md disabled:opacity-50"
+              >
+                {authLoading ? "Signing in..." : "Sign In"}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-border text-center">
+              <p className="text-sm text-muted-foreground">
+                Don't have an account? Contact your administrator.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main View Area */}
       <main className="flex-1 p-4 h-[calc(100vh-65px)] overflow-hidden">
@@ -174,18 +239,27 @@ function App() {
 
           </div>
         ) : (
-          // 🛡️ SECURITY ENFORCEMENT
-          // If view is 'dashboard', we strictly check auth status
+          // Dashboard View - Protected
           <>
-            <SignedIn>
+            {user ? (
               <div className="h-full overflow-y-auto">
                 <Dashboard />
               </div>
-            </SignedIn>
-            <SignedOut>
-               {/* If they are here but signed out, redirect them immediately */}
-               <RedirectToSignIn />
-            </SignedOut>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                  <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto" />
+                  <h2 className="text-2xl font-bold">Authentication Required</h2>
+                  <p className="text-muted-foreground">Please sign in to access the dashboard.</p>
+                  <button
+                    onClick={() => setShowSignIn(true)}
+                    className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all shadow-md"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

@@ -1,16 +1,85 @@
-# React + Vite
+# HireFlow AI - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 🚀 Tech Stack
 
-Currently, two official plugins are available:
+- **React 19** - Latest React with concurrent features
+- **Vite 7** - Lightning-fast build tool
+- **Tailwind CSS v4** - Modern utility-first styling
+- **Supabase Auth** - Authentication & user management
+- **Monaco Editor** - VS Code-powered code editor
+- **Recharts** - Data visualization
+- **Lucide React** - Beautiful icon library
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📦 Installation
 
-## React Compiler
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🔧 Configuration
 
-## Expanding the ESLint configuration
+Create a `.env.local` file in the client directory:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```env
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_URL=http://localhost:5000
+```
+
+## 🏃 Development
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## 🏗️ Build
+
+```bash
+npm run build
+```
+
+## 📁 Project Structure
+
+```
+client/
+├── src/
+│   ├── components/       # React components
+│   │   ├── ChatInterface.jsx
+│   │   ├── CodeEditor.jsx
+│   │   ├── Dashboard.jsx
+│   │   └── StatsChart.jsx
+│   ├── lib/             # Utilities & configs
+│   │   ├── api.js       # Axios instance
+│   │   └── supabase.js  # Supabase client
+│   ├── App.jsx          # Main app component
+│   ├── main.jsx         # Entry point
+│   └── index.css        # Global styles
+├── public/              # Static assets
+└── package.json
+```
+
+## 🔐 Authentication
+
+This app uses **Supabase Auth** for authentication:
+
+- Email/Password sign-in for HR users
+- JWT token-based API authentication
+- Session persistence across page refreshes
+- Protected dashboard routes
+
+## 🎨 Features
+
+- **Interview Platform** - Public access for candidates
+- **HR Dashboard** - Protected, requires authentication
+- **Real-time Chat** - AI-powered interview conversations
+- **Code Editor** - Built-in Monaco editor for coding challenges
+- **Analytics** - Performance metrics and hiring insights
+
+## 📚 Learn More
+
+- [React Documentation](https://react.dev)
+- [Vite Documentation](https://vite.dev)
+- [Tailwind CSS](https://tailwindcss.com)
+- [Supabase Auth](https://supabase.com/docs/guides/auth)

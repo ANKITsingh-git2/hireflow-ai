@@ -60,7 +60,7 @@ HireFlow AI automates the entire process:
 - 🧠 **RAG Architecture**: Retrieval-Augmented Generation for context-aware questions
 - 🔍 **Vector Search**: Pinecone for semantic resume matching
 - 🎨 **Modern UI**: Tailwind CSS v4 with dark mode support
-- 🔐 **Enterprise Auth**: Clerk authentication with role-based access
+- 🔐 **Secure Auth**: Supabase authentication with JWT tokens
 - 📱 **Responsive Design**: Works on desktop, tablet, and mobile
 
 ---
@@ -78,7 +78,7 @@ HireFlow AI automates the entire process:
 - **Tailwind CSS v4** - Utility-first styling
 - **Monaco Editor** - VS Code-powered code editor
 - **Recharts** - Data visualization
-- **Clerk** - Authentication & user management
+- **Supabase Auth** - Authentication & user management
 - **Lucide React** - Beautiful icons
 
 ### Backend
@@ -142,7 +142,8 @@ graph TB
 ### Prerequisites
 - Node.js 20.19+ or 22.12+
 - MongoDB (local or Atlas)
-- API Keys: Google AI, Pinecone, Clerk
+- Supabase account (free)
+- API Keys: Google AI, Pinecone
 
 ### Installation
 
@@ -179,17 +180,19 @@ npm run dev
 #### Backend (.env)
 ```env
 MONGO_URI=mongodb://localhost:27017/hireflow
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 GOOGLE_API_KEY=your_google_ai_key
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX_NAME=hireflow-resumes
-CLERK_SECRET_KEY=your_clerk_secret
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_app_password
 ```
 
 #### Frontend (.env.local)
 ```env
-VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_API_URL=http://localhost:5000
 ```
 
@@ -242,7 +245,7 @@ Response:
 #### 3. End Interview
 ```http
 POST /api/interview/end
-Authorization: Bearer <clerk_token>
+Authorization: Bearer <supabase_jwt_token>
 Content-Type: application/json
 
 Body:
@@ -268,7 +271,7 @@ Response:
 #### 4. Export PDF Report
 ```http
 GET /api/interviews/:id/export
-Authorization: Bearer <clerk_token>
+Authorization: Bearer <supabase_jwt_token>
 
 Response: PDF file download
 ```
@@ -276,7 +279,7 @@ Response: PDF file download
 #### 5. Get All Interviews
 ```http
 GET /api/interviews
-Authorization: Bearer <clerk_token>
+Authorization: Bearer <supabase_jwt_token>
 
 Response:
 [
@@ -369,7 +372,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Google Gemini for AI capabilities
 - Pinecone for vector search
-- Clerk for authentication
+- Supabase for authentication
 - MongoDB for database
 - Vercel & Render for hosting
 
