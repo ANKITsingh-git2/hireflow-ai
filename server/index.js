@@ -26,7 +26,28 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost for development
+    if (origin.includes('localhost')) return callback(null, true);
+    
+    // Allow all Vercel preview and production URLs
+    if (origin.includes('vercel.app')) return callback(null, true);
+    
+    // Allow specific production domain if you have one
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://hireflow-ai-alpha.vercel.app'
+    ].filter(Boolean);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 })); // Enable frontend → backend access
 app.use(express.json()); // Parse JSON in request body
