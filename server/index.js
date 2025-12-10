@@ -118,8 +118,11 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    // Get resume-based context from Vector DB, filtered by candidateId
-    const context = await queryVectorDB(message, candidateId);
+    // Only query Vector DB if a resume has been uploaded (candidateId exists)
+    let context = "";
+    if (candidateId) {
+      context = await queryVectorDB(message, candidateId);
+    }
 
     // Your EXACT system prompt — NOT modified
     const systemPrompt = `
@@ -128,10 +131,10 @@ app.post("/api/chat", async (req, res) => {
       Your Goal: Conduct a technical screening interview for a Software Engineering role.
       
       CONTEXT FROM CANDIDATE'S RESUME:
-      "${context || "No specific resume context found. Ask general technical questions."}"
+      "${context || "No resume uploaded yet. Ask the candidate to upload their resume first, or ask general technical questions."}"
       
       INSTRUCTIONS:
-      1. Use the Context above to ask specific questions about their experience.
+      1. ${candidateId ? "Use the Context above to ask specific questions about their experience." : "Ask the candidate to upload their resume, or ask general technical screening questions."}
       2. Keep your responses concise (max 2-3 sentences).
       3. Be professional but conversational.
       4. Do not reveal that you were given this context text directly.
