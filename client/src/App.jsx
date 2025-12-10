@@ -181,24 +181,30 @@ function App() {
 
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
+                <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="hr@company.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium mb-2">Password</label>
                 <input
+                  id="password"
+                  name="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="••••••••"
                 />
